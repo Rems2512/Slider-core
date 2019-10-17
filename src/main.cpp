@@ -2,8 +2,8 @@
 #include "SPIFFS.h"
 #include "ESPAsyncWebServer.h"
  
-const char* ssid = "Milter";
-const char* password =  "52275829966430474895";
+const char* ssid = "Kamera-Slider";
+const char* password =  "123456789";
  
 AsyncWebServer server(80);
  
@@ -15,12 +15,14 @@ void setup(){
      return;
   }
  
-  WiFi.begin(ssid, password);
+  Serial.print("Setting AP (Access Point)…");
+  // Remove the password parameter, if you want the AP (Access Point) to be open
+  WiFi.softAP(ssid, password);
  
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.println("Connecting to WiFi..");
-  }
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(IP);
+  
  
   Serial.println(WiFi.localIP());
  
