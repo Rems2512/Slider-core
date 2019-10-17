@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+    <meta charset='utf-8'>
+    <script src="test.js"></script>
+</head>
+
+<body>
+    <button onclick="openAlert()">Click me</button>
+</body>
+
+<div id="demo">
+    <h1>The ESP8266 NodeMCU Update web page without refresh</h1>
+    <button type="button" onclick="sendData(1)">LED ON</button>
+    <button type="button" onclick="sendData(0)">LED OFF</button><BR>
+</div>
+
+<div>
+    ADC Value is : <span id="ADCValue">0</span><br>
+    LED State is : <span id="LEDState">NA</span>
+</div>
+
+</html>
