@@ -8,3 +8,6 @@ Git
 
 VisualStudio Code
   -PlaformIO
+
+https://www.thingiverse.com/thing:2395921 2020 Slider
+https://www.thingiverse.com/thing:1433295 Belt Holder
