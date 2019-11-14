@@ -1,31 +1,39 @@
+<!DOCTYPE html>
+<html>
+
 <head>
-    <link rel="stylesheet" type="text/css" href="dashboard.css">
+  <title>LED Control</title>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0, user-scalable=no' />
+  <meta charset='utf-8'>
+  <link rel="stylesheet" type="text/css" href="dashboard.css">
+  <script type="text/javascript" src="script.js"></script>
 </head>
- 
+
 <body>
-    <div class="dashboard">
- 
-        <div class="circle-container">
-            <div class="circle">
- 
-                <div class="circle__content">
-                    24ºC
-                </div>
-                <div class="circle__lower-text">
-                    Temperature
-                </div>
-            </div>
-        </div>
- 
-        <div class="circle-container">
-            <div class="circle">
-                <div class="circle__content">
-                    22%
-                </div>
-                <div class="circle__lower-text">
-                    Humidity
-                </div>
-            </div>
-        </div>
+
+
+  <h1> ESP32 WebServer</h1>
+
+  <h3>Using Access Point(AP) Mode</h3>
+
+  <div class="flex">
+
+    <div class="buttondiv">
+      <p> Status: <span id="MStatusL">NA</span></p>
+      <a id="ButtonL" class="button button-off" onclick="motor('links')">&#171;&#171;</a>  <!--    &#171; ist <<  -->
     </div>
+    <div class="buttondiv">
+      <p> Status: <span id="MStatusR">NA</span></p>
+      <a id="ButtonR" class="button button-off" onclick="motor('rechts')">&#187;&#187;</a>  <!--    &#187; ist >>  -->
+    </div>
+  </div>
+
+  <p> MotorPosition: <span id="Position">NA</span> </p>
+
+  <div>
+    <p class="text-dark">Tom du bist ein Bot!</p>
+  </div>
 </body>
+
+
+</html>
