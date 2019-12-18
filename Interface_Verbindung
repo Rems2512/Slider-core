@@ -1,0 +1,792 @@
+#include <TMCStepper.h>
+#include <TMCStepper_UTILITY.h>
+
+#include <OSCBundle.h>
+#include <WiFi.h>
+#include <WiFiUdp.h>
+#include <WiFiAP.h>
+
+const char *ssid = "Slider";                // Name des Netzwerks
+const char *password = "slideslide";        // Passwort des Netzwerks
+
+WiFiServer server(80);                      // Server Instanz -> ESP als Access Point
+WiFiUDP Udp;                                // UDP Instanz um Pakete über UDP zu senden / empfangen
+
+const IPAddress outIp(192, 168, 4, 2);      // IP des Clients
+const unsigned int destPort = 9999;          // Incoming-Port des Clients
+const unsigned int localPort = 8888;        // Incoming-Ports des Hosts für ankommende Nachrichten
+
+
+
+OSCErrorCode error;
+//Variablen:
+
+int Geschwindigkeit; //Geschwindikeit des Sliders
+
+//Variablen für ????
+float Tiltkopf;
+float Pankopf;
+float SliderPosition;
+
+//Variablen für KeyFrame Toggle
+bool KeyFrame_1;
+bool KeyFrame_2;
+bool KeyFrame_3;
+bool KeyFrame_4;
+bool KeyFrame_5;
+
+//Variablen für KeyFrame Position
+float KeyFramePosition_1;
+float KeyFramePosition_2;
+float KeyFramePosition_3;
+float KeyFramePosition_4;
+float KeyFramePosition_5;
+
+//Variablen für KeyFrame Pan
+float KeyFramePan_1;
+float KeyFramePan_2;
+float KeyFramePan_3;
+float KeyFramePan_4;
+float KeyFramePan_5;
+
+//Variablen für KeyFrame Tilt
+float KeyFrameTilt_1;
+float KeyFrameTilt_2;
+float KeyFrameTilt_3;
+float KeyFrameTilt_4;
+float KeyFrameTilt_5;
+
+//Variablen für KeyFrame Beschleunigung
+float KeyFrameBeschleunigung_1;
+float KeyFrameBeschleunigung_2;
+float KeyFrameBeschleunigung_3;
+float KeyFrameBeschleunigung_4;
+float KeyFrameBeschleunigung_5;
+
+//Variablen für KeyFrame Beschleunigung
+float KeyFrameGeschwindigkeit_1;
+float KeyFrameGeschwindigkeit_2;
+float KeyFrameGeschwindigkeit_3;
+float KeyFrameGeschwindigkeit_4;
+float KeyFrameGeschwindigkeit_5;
+
+//Variablen für KeyFrame Pausendauer
+float KeyFramePause_1;
+float KeyFramePause_2;
+float KeyFramePause_3;
+float KeyFramePause_4;
+float KeyFramePause_5;
+
+//Modus 3 Einlesen
+int Runter;
+int Hoch;
+int Links;
+int Rechts;
+int Vor;
+int Zuruck;
+
+bool go; //ist der Slider an oder ist der Slider aus?
+
+float Beschleunigung; //Beschleunigungsart zwischen linear und smooth
+
+int Bildzahl;//Anzahl der Bilder zwischen zwei Keyframes im Modus2
+int Wartedauer;//Zeit zwischen den Bildern
+
+int modus; //Nummer des aktuellen Modoi
+
+int bilder; //Anzahl der Bilder
+
+//Slider
+float SliderPositon;
+float SliderPan;
+float SliderTilt;
+
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(13, OUTPUT);
+
+  // Server starten + Feedback
+  Serial.println("Configuring access point...");
+  WiFi.softAP(ssid, password);
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("ESP IP address: ");
+  Serial.println(myIP);
+  server.begin();
+
+  // UDP starten + Feedback
+  Serial.println("Starting UDP...");
+  Udp.begin(localPort);
+  Serial.print("Local port: ");
+  Serial.println(localPort);
+}
+
+void loop() {
+  OSCMsgReceive();
+
+}
+
+
+void OSCMsgReceive() {
+  OSCMessage msgIN;
+  int size;
+  if ((size = Udp.parsePacket()) > 0) {
+    while (size--) 
+      msgIN.fill(Udp.read());
+      if (!msgIN.hasError()) {
+/*        msgIN.route("/modus_0", Modus); // die 4 Modi mit alle der gleichen Funktion
+        msgIN.route("/modus_1", Modus);
+        msgIN.route("/modus_2", Modus);
+        msgIN.route("/modus_3", Modus);
+*/
+
+        msgIN.route("/modus_1/start", start); //Startknöpfe
+        msgIN.route("/modus_0/start", start);
+
+        msgIN.route("/modus_1/slider_fader", SliderBewegung); //Positionseinstellungen
+        msgIN.route("/modus_1/pan_encoder", Pankopf_Bewegung);
+        msgIN.route("/modus_1/tilt_position", Tiltkopf_Bewegung);
+
+        msgIN.route("/modus_0/slider_fader", SliderBewegung); //modus 0 ruft gleiche Funktionen auf wie modus 1
+        msgIN.route("/modus_0/pan_encoder", Pankopf_Bewegung);
+        msgIN.route("/modus_0/tilt_encoder", Tiltkopf_Bewegung);
+
+        msgIN.route("/modus_0/keyframe_1", Keyframe1);                    //KeyFrame 1, Modus 0
+        msgIN.route("/modus_0/View_1", ViewKeyFrame1);
+        msgIN.route("/modus_0/Geschwindigkeit_1", GeschwindigkeitKeyFrame1);
+        msgIN.route("/modus_0/Pause_1", PauseKeyFrame1);
+
+        msgIN.route("/modus_0/keyframe_2", Keyframe2);                    //KeyFrame 2, Modus 0
+        msgIN.route("/modus_0/View_2", ViewKeyFrame2);
+        msgIN.route("/modus_0/Geschwindigkeit_2", GeschwindigkeitKeyFrame2);
+        msgIN.route("/modus_0/Pause_2", PauseKeyFrame2);
+
+        //Modus_1
+        msgIN.route("/modus_1/keyframe_1", Keyframe1);                    //KeyFrame 1, Modus 1
+        msgIN.route("/modus_1/View_1", ViewKeyFrame1);
+        msgIN.route("/modus_1/Geschwindigkeit_1", GeschwindigkeitKeyFrame1);
+        msgIN.route("/modus_1/Beschleunigung_1", BeschleunigungKeyFrame1);
+        msgIN.route("/modus_1/Pause_1", PauseKeyFrame1);
+
+        msgIN.route("/modus_1/keyframe_2", Keyframe2);                    //KeyFrame 2, Modus 1
+        msgIN.route("/modus_1/View_2", ViewKeyFrame2);
+        msgIN.route("/modus_1/Geschwindigkeit_2", GeschwindigkeitKeyFrame2);
+        msgIN.route("/modus_1/Beschleunigung_2", BeschleunigungKeyFrame2);
+        msgIN.route("/modus_1/Pause_2", PauseKeyFrame2);
+
+        msgIN.route("/modus_1/keyframe_3", Keyframe3);                    //KeyFrame 3
+        msgIN.route("/modus_1/View_3", ViewKeyFrame3);
+        msgIN.route("/modus_1/Geschwindigkeit_3", GeschwindigkeitKeyFrame3);
+        msgIN.route("/modus_1/Beschleunigung_3", BeschleunigungKeyFrame3);
+        msgIN.route("/modus_1/Pause_3", PauseKeyFrame3);
+
+        msgIN.route("/modus_1/keyframe_4", Keyframe4);                    //KeyFrame 4
+        msgIN.route("/modus_1/View_4", ViewKeyFrame4);
+        msgIN.route("/modus_1/Geschwindigkeit_4", GeschwindigkeitKeyFrame4);
+        msgIN.route("/modus_1/Beschleunigung_4", BeschleunigungKeyFrame4);
+        msgIN.route("/modus_1/Pause_4", PauseKeyFrame4);
+
+        msgIN.route("/modus_1/keyframe_5", Keyframe5);                    //KeyFrame 5
+        msgIN.route("/modus_1/View_5", ViewKeyFrame5);
+        msgIN.route("/modus_1/Geschwindigkeit_5", GeschwindigkeitKeyFrame5);
+        msgIN.route("/modus_1/Beschleunigung_5", BeschleunigungKeyFrame5);
+        msgIN.route("/modus_1/Pause_5", PauseKeyFrame5);
+
+
+        //Modus_2
+        msgIN.route("/modus_2/Bilder", Bilder);
+        
+        //Modus_3
+        msgIN.route("/modus_3/runter", runter);
+        msgIN.route("/modus_3/hoch", hoch);
+        msgIN.route("/modus_3/links", links);
+        msgIN.route("/modus_3/rechts", rechts);
+        msgIN.route("/modus_3/vor", vor);
+        msgIN.route("/modus_3/zuruck", zuruck);
+      }
+    }
+  
+}
+
+
+//mehrfach verwendete Funktionen-------------------------------------------------------------------------------------------------
+/*void UIupdate{
+
+  //modus 0 Slider Position
+  OSCMessage msgOUT("/modus_0/slider_fader");
+  msgOUT.add(Pankopf);      //Slider Position Variable
+  Udp.beginPacket(Udp.remoteIP(), destPort);    //Sendet den Wert der am Encoder eingestellt wurde an den Anzeiger für die Position
+  msgOUT.send(Udp); // send the bytes
+  Udp.endPacket(); // mark the end of the OSC Packet
+  msgOUT.empty(); // free space occupied by message
+
+  //modus 0 Pan Position
+  OSCMessage msgOUT("/modus_0/pan_position");
+  msgOUT.add(Pankopf);      //Oan Position Variable
+  Udp.beginPacket(Udp.remoteIP(), destPort);    //Sendet den Wert der am Encoder eingestellt wurde an den Anzeiger für die Position
+  msgOUT.send(Udp); // send the bytes
+  Udp.endPacket(); // mark the end of the OSC Packet
+  msgOUT.empty(); // free space occupied by message
+
+  //modus 0 Tiltkopf
+  OSCMessage msgOUT("/modus_0/tilt_encoder");
+  msgOUT.add(Pankopf);      //Tilt Position Variable
+  Udp.beginPacket(Udp.remoteIP(), destPort);    //Sendet den Wert der am Encoder eingestellt wurde an den Anzeiger für die Position
+  msgOUT.send(Udp); // send the bytes
+  Udp.endPacket(); // mark the end of the OSC Packet
+  msgOUT.empty(); // free space occupied by message
+
+
+  //modus 1 Slider Position
+  OSCMessage msgOUT("/modus_1/slider_fader");
+  msgOUT.add(Pankopf);      //Slider Position Variable
+  Udp.beginPacket(Udp.remoteIP(), destPort);    //Sendet den Wert der am Encoder eingestellt wurde an den Anzeiger für die Position
+  msgOUT.send(Udp); // send the bytes
+  Udp.endPacket(); // mark the end of the OSC Packet
+  msgOUT.empty(); // free space occupied by message
+
+  //modus 1 Pan Position
+  OSCMessage msgOUT("/modus_1/pan_position");
+  msgOUT.add(Pankopf);      //Oan Position Variable
+  Udp.beginPacket(Udp.remoteIP(), destPort);    //Sendet den Wert der am Encoder eingestellt wurde an den Anzeiger für die Position
+  msgOUT.send(Udp); // send the bytes
+  Udp.endPacket(); // mark the end of the OSC Packet
+  msgOUT.empty(); // free space occupied by message
+
+  //modus 1 Tiltkopf
+  OSCMessage msgOUT("/modus_1/tilt_position");
+  msgOUT.add(Pankopf);      //Tilt Position Variable
+  Udp.beginPacket(Udp.remoteIP(), destPort);    //Sendet den Wert der am Encoder eingestellt wurde an den Anzeiger für die Position
+  msgOUT.send(Udp); // send the bytes
+  Udp.endPacket(); // mark the end of the OSC Packet
+  msgOUT.empty(); // free space occupied by message
+}
+*/
+
+
+
+/*void Modus(OSCMessage &msg, int addrOffset ) { // In welchem Modus sind wir
+
+  modus = msg.getFloat(0);
+
+  if (modus == 1) {
+    modus = 0;
+  }
+  if (modus == 3) {
+    modus = 1;
+  }
+  if (modus == 5) {
+    modus = 2;
+  }
+  if (modus == 7) {
+    modus = 3;
+  }
+  Serial.print("Modus:"); //Hier einfügen, was gemacht werden soll
+  Serial.println(modus);
+
+}
+*/
+
+void start(OSCMessage &msg, int addrOffset ) { // Slider Position Modus 1
+
+  go = msg.getFloat(0);
+
+  Serial.print("Start? "); //Hier einfügen, was gemacht werden soll
+  Serial.println(go);
+
+}
+
+
+void SliderBewegung(OSCMessage &msg, int addrOffset ) { // Slider Position Modus 1
+
+  SliderPositon = msg.getFloat(0);
+  //OSCMessage msgOUT("/modus_1/slider_fader");    //Hier Knopf Bezeichnung für Ziel einfügen
+
+  Serial.print("Sliderposition = : "); //Hier einfügen, was gemacht werden soll
+  Serial.println(SliderPosition);
+
+}
+
+
+
+void Pankopf_Bewegung(OSCMessage &msg, int addrOffset ) {    //Pankopf1
+
+  Pankopf = msg.getFloat(0);
+  if (modus == 1) {
+    OSCMessage msgOUT("/modus_1/pan_position");
+    msgOUT.add(Pankopf);
+    Udp.beginPacket(Udp.remoteIP(), destPort);    //Sendet den Wert der am Encoder eingestellt wurde an den Anzeiger für die Position
+    msgOUT.send(Udp); // send the bytes
+    Udp.endPacket(); // mark the end of the OSC Packet
+    msgOUT.empty(); // free space occupied by message
+  }
+  if (modus == 0) {
+    OSCMessage msgOUT("/modus_0/pan_position");
+    msgOUT.add(Pankopf);
+    Udp.beginPacket(Udp.remoteIP(), destPort);    //Sendet den Wert der am Encoder eingestellt wurde an den Anzeiger für die Position
+    msgOUT.send(Udp); // send the bytes
+    Udp.endPacket(); // mark the end of the OSC Packet
+    msgOUT.empty(); // free space occupied by message
+  }
+
+  Serial.print("Pankopf = : ");
+  Serial.println(Pankopf);
+
+
+
+
+
+
+}
+
+
+
+void Tiltkopf_Bewegung (OSCMessage &msg, int addrOffset ) { // Slider Position Modus 1
+
+  Tiltkopf = msg.getFloat(0);
+  //OSCMessage msgOUT("/modus_1/slider_fader");    //Hier Knopf Bezeichnung für Ziel einfügen
+
+  Serial.print("Tiltkopf = : "); //Hier einfügen, was gemacht werden soll
+  Serial.println(Tiltkopf);
+
+}
+
+
+
+//Modus 1 Keyframes----------------------------------------------------------------------------------------------
+void Keyframe1(OSCMessage &msg, int addrOffset ) {
+  int i = 0;
+  KeyFrame_1 = msg.getFloat(0);
+  //OSCMessage msgOUT("/Modus 1/encoder2");
+
+  Serial.print("Keyframe 1 set? = : ");
+  Serial.println(KeyFrame_1);
+  if (KeyFrame_1 == 1) {
+    i++;
+    if (KeyFramePosition_1 == 0 && KeyFramePan_1 == 0 && KeyFrameTilt_1 == 0 && i == 1) {
+      KeyFramePosition_1 = SliderPosition;
+      KeyFramePan_1 = Pankopf;
+      KeyFrameTilt_1 = Tiltkopf;
+      Serial.print("Keyframe 1 Position = : ");
+      Serial.println(KeyFramePosition_1);
+      Serial.print("Keyframe 1 Pan = : ");
+      Serial.println(KeyFramePan_1);
+      Serial.print("Keyframe 1 Tilt = : ");
+      Serial.println(KeyFrameTilt_1);
+    }
+  }
+  if (KeyFrame_1 == 0) {
+    i = 0;
+    KeyFramePosition_1 = 0;
+    KeyFramePan_1 = 0;
+    KeyFrameTilt_1 = 0;
+    Serial.print("Keyframe 1 Position = : ");
+    Serial.println(KeyFramePosition_1);
+    Serial.print("Keyframe 1 Pan = : ");
+    Serial.println(KeyFramePan_1);
+    Serial.print("Keyframe 1 Tilt = : ");
+    Serial.println(KeyFrameTilt_1);
+
+  }
+}
+
+void ViewKeyFrame1(OSCMessage &msg, int addrOffset ) { //Anzeige des 1. Keyframes
+  bool view = msg.getFloat(0);
+  //OSCMessage msgOUT("/Modus 1/encoder2");
+
+  Serial.print("View Keyframe1?= : ");
+  Serial.println(view); {
+    if (view == 1) {
+      SliderPosition = KeyFramePosition_1;
+      Pankopf = KeyFramePan_1;
+      Tiltkopf = KeyFrameTilt_1;
+    }
+  }
+}
+
+void BeschleunigungKeyFrame1(OSCMessage &msg, int addrOffset ) { //Beschleunigung des 1. KeyFrames
+  KeyFrameBeschleunigung_1 = msg.getFloat(0);
+
+  Serial.print("KeyFrameBeschleunigung_1?= : ");
+  Serial.println(KeyFrameBeschleunigung_1);
+}
+
+
+void GeschwindigkeitKeyFrame1(OSCMessage &msg, int addrOffset ) { //Geschwindigkeit des 1. KeyFrames
+  KeyFrameGeschwindigkeit_1 = msg.getFloat(0);
+
+  Serial.print("KeyFrameGeschwindigkeit_1?= : ");
+  Serial.println(KeyFrameGeschwindigkeit_1);
+}
+
+
+void PauseKeyFrame1(OSCMessage &msg, int addrOffset ) { //Pause des 1. KeyFrames
+  KeyFramePause_1 = msg.getFloat(0);
+
+  Serial.print("KeyFramePause_1?= : ");
+  Serial.println(KeyFramePause_1);
+}
+
+
+//Modus 1 Keyframe 2---------------------------------------------------------------------------------------------------
+void Keyframe2(OSCMessage &msg, int addrOffset ) {
+  int i = 0;
+  KeyFrame_2 = msg.getFloat(0);
+
+
+  Serial.print("Keyframe 2 set? = : ");
+  Serial.println(KeyFrame_2);
+  if (KeyFrame_2 == 1) {
+    i++;
+    if (KeyFramePosition_2 == 0 && KeyFramePan_2 == 0 && KeyFrameTilt_2 == 0 && i == 1) {
+      KeyFramePosition_2 = SliderPosition;
+      KeyFramePan_2 = Pankopf;
+      KeyFrameTilt_2 = Tiltkopf;
+      Serial.print("Keyframe 2 Position = : ");
+      Serial.println(KeyFramePosition_2);
+      Serial.print("Keyframe 2 Pan = : ");
+      Serial.println(KeyFramePan_2);
+      Serial.print("Keyframe 2 Tilt = : ");
+      Serial.println(KeyFrameTilt_2);
+    }
+  }
+  if (KeyFrame_2 == 0) {
+    i = 0;
+    KeyFramePosition_2 = 0;
+    KeyFramePan_2 = 0;
+    KeyFrameTilt_2 = 0;
+    Serial.print("Keyframe 2 Position = : ");
+    Serial.println(KeyFramePosition_2);
+    Serial.print("Keyframe 2 Pan = : ");
+    Serial.println(KeyFramePan_2);
+    Serial.print("Keyframe 2 Tilt = : ");
+    Serial.println(KeyFrameTilt_2);
+
+  }
+}
+
+void ViewKeyFrame2(OSCMessage &msg, int addrOffset ) { //Anzeige des 2. Keyframes
+  bool view = msg.getFloat(0);
+
+  Serial.print("View Keyframe2?= : ");
+  Serial.println(view);
+  if (view == 1) {
+    SliderPosition = KeyFramePosition_2;
+    Pankopf = KeyFramePan_2;
+    Tiltkopf = KeyFrameTilt_2;
+  }
+}
+
+void BeschleunigungKeyFrame2(OSCMessage &msg, int addrOffset ) { //Beschleunigung des 2. KeyFrames
+  KeyFrameBeschleunigung_2 = msg.getFloat(0);
+
+  Serial.print("KeyFrameBeschleunigung_2?= : ");
+  Serial.println(KeyFrameBeschleunigung_2);
+}
+
+
+void GeschwindigkeitKeyFrame2(OSCMessage &msg, int addrOffset ) { //Geschwindigkeit des 2. KeyFrames
+  KeyFrameGeschwindigkeit_2 = msg.getFloat(0);
+
+  Serial.print("KeyFrameGeschwindigkeit_2?= : ");
+  Serial.println(KeyFrameGeschwindigkeit_2);
+}
+
+
+void PauseKeyFrame2(OSCMessage &msg, int addrOffset ) { //Pause des 2. KeyFrames
+  KeyFramePause_2 = msg.getFloat(0);
+
+  Serial.print("KeyFramePause_2?= : ");
+  Serial.println(KeyFramePause_2);
+}
+
+
+//Modus 1 Keyframe 3---------------------------------------------------------------------------------------------------
+void Keyframe3(OSCMessage &msg, int addrOffset ) {
+  int i = 0;
+  KeyFrame_3 = msg.getFloat(0);
+
+
+  Serial.print("Keyframe 3 set? = : ");
+  Serial.println(KeyFrame_3);
+  if (KeyFrame_3 == 1) {
+    i++;
+    if (KeyFramePosition_3 == 0 && KeyFramePan_3 == 0 && KeyFrameTilt_3 == 0 && i == 1) {
+      KeyFramePosition_3 = SliderPosition;
+      KeyFramePan_3 = Pankopf;
+      KeyFrameTilt_3 = Tiltkopf;
+      Serial.print("Keyframe 3 Position = : ");
+      Serial.println(KeyFramePosition_3);
+      Serial.print("Keyframe 3 Pan = : ");
+      Serial.println(KeyFramePan_3);
+      Serial.print("Keyframe 3 Tilt = : ");
+      Serial.println(KeyFrameTilt_3);
+    }
+  }
+  if (KeyFrame_3 == 0) {
+    i = 0;
+    KeyFramePosition_3 = 0;
+    KeyFramePan_3 = 0;
+    KeyFrameTilt_3 = 0;
+    Serial.print("Keyframe 3 Position = : ");
+    Serial.println(KeyFramePosition_3);
+    Serial.print("Keyframe 3 Pan = : ");
+    Serial.println(KeyFramePan_3);
+    Serial.print("Keyframe 2 Tilt = : ");
+    Serial.println(KeyFrameTilt_3);
+
+  }
+}
+
+void ViewKeyFrame3(OSCMessage &msg, int addrOffset ) { //Anzeige des 3. Keyframes
+  bool view = msg.getFloat(0);
+
+  Serial.print("View Keyframe3?= : ");
+  Serial.println(view);
+  if (view == 1) {
+    SliderPosition = KeyFramePosition_3;
+    Pankopf = KeyFramePan_3;
+    Tiltkopf = KeyFrameTilt_3;
+  }
+}
+
+void BeschleunigungKeyFrame3(OSCMessage &msg, int addrOffset ) { //Beschleunigung des 3. KeyFrames
+  KeyFrameBeschleunigung_3 = msg.getFloat(0);
+
+  Serial.print("KeyFrameBeschleunigung_3?= : ");
+  Serial.println(KeyFrameBeschleunigung_3);
+}
+
+
+void GeschwindigkeitKeyFrame3(OSCMessage &msg, int addrOffset ) { //Geschwindigkeit des 3. KeyFrames
+  KeyFrameGeschwindigkeit_3 = msg.getFloat(0);
+
+  Serial.print("KeyFrameGeschwindigkeit_3?= : ");
+  Serial.println(KeyFrameGeschwindigkeit_3);
+}
+
+
+void PauseKeyFrame3(OSCMessage &msg, int addrOffset ) { //Pause des 3. KeyFrames
+  KeyFramePause_3 = msg.getFloat(0);
+
+  Serial.print("KeyFramePause_3?= : ");
+  Serial.println(KeyFramePause_3);
+}
+
+//Modus 1 Keyframe 4---------------------------------------------------------------------------------------------------
+void Keyframe4(OSCMessage &msg, int addrOffset ) {
+  int i = 0;
+  KeyFrame_4 = msg.getFloat(0);
+
+
+  Serial.print("Keyframe 4 set? = : ");
+  Serial.println(KeyFrame_4);
+  if (KeyFrame_4 == 1) {
+    i++;
+    if (KeyFramePosition_4 == 0 && KeyFramePan_4 == 0 && KeyFrameTilt_4 == 0 && i == 1) {
+      KeyFramePosition_4 = SliderPosition;
+      KeyFramePan_4 = Pankopf;
+      KeyFrameTilt_4 = Tiltkopf;
+      Serial.print("Keyframe 4 Position = : ");
+      Serial.println(KeyFramePosition_4);
+      Serial.print("Keyframe 4 Pan = : ");
+      Serial.println(KeyFramePan_4);
+      Serial.print("Keyframe 4 Tilt = : ");
+      Serial.println(KeyFrameTilt_4);
+    }
+  }
+  if (KeyFrame_4 == 0) {
+    i = 0;
+    KeyFramePosition_4 = 0;
+    KeyFramePan_4 = 0;
+    KeyFrameTilt_4 = 0;
+    Serial.print("Keyframe 4 Position = : ");
+    Serial.println(KeyFramePosition_4);
+    Serial.print("Keyframe 4 Pan = : ");
+    Serial.println(KeyFramePan_3);
+    Serial.print("Keyframe 4 Tilt = : ");
+    Serial.println(KeyFrameTilt_4);
+
+  }
+}
+
+void ViewKeyFrame4(OSCMessage &msg, int addrOffset ) { //Anzeige des 4. KeyFrames
+  bool view = msg.getFloat(0);
+
+  Serial.print("View Keyframe4?= : ");
+  Serial.println(view);
+  if (view == 1) {
+    SliderPosition = KeyFramePosition_4;
+    Pankopf = KeyFramePan_4;
+    Tiltkopf = KeyFrameTilt_4;
+  }
+}
+
+void BeschleunigungKeyFrame4(OSCMessage &msg, int addrOffset ) { //Beschleunigung des 4. KeyFrames
+  KeyFrameBeschleunigung_4 = msg.getFloat(0);
+
+  Serial.print("KeyFrameBeschleunigung_4?= : ");
+  Serial.println(KeyFrameBeschleunigung_4);
+}
+
+
+void GeschwindigkeitKeyFrame4(OSCMessage &msg, int addrOffset ) { //Geschwindigkeit des 4. KeyFrames
+  KeyFrameGeschwindigkeit_4 = msg.getFloat(0);
+
+  Serial.print("KeyFrameGeschwindigkeit_4?= : ");
+  Serial.println(KeyFrameGeschwindigkeit_4);
+}
+
+
+void PauseKeyFrame4(OSCMessage &msg, int addrOffset ) { //Pause des 4. KeyFrames
+  KeyFramePause_4 = msg.getFloat(0);
+
+  Serial.print("KeyFramePause_4?= : ");
+  Serial.println(KeyFramePause_4);
+}
+
+//Modus 1 Keyframe 5---------------------------------------------------------------------------------------------------
+void Keyframe5(OSCMessage &msg, int addrOffset ) {
+  int i = 0;
+  KeyFrame_5 = msg.getFloat(0);
+
+
+  Serial.print("Keyframe 5 set? = : ");
+  Serial.println(KeyFrame_5);
+  if (KeyFrame_5 == 1) {
+    i++;
+    if (KeyFramePosition_5 == 0 && KeyFramePan_5 == 0 && KeyFrameTilt_5 == 0 && i == 1) {
+      KeyFramePosition_5 = SliderPosition;
+      KeyFramePan_5 = Pankopf;
+      KeyFrameTilt_5 = Tiltkopf;
+      Serial.print("Keyframe 5 Position = : ");
+      Serial.println(KeyFramePosition_5);
+      Serial.print("Keyframe 5 Pan = : ");
+      Serial.println(KeyFramePan_5);
+      Serial.print("Keyframe 5 Tilt = : ");
+      Serial.println(KeyFrameTilt_5);
+    }
+  }
+  if (KeyFrame_5 == 0) {
+    i = 0;
+    KeyFramePosition_5 = 0;
+    KeyFramePan_5 = 0;
+    KeyFrameTilt_5 = 0;
+    Serial.print("Keyframe 5 Position = : ");
+    Serial.println(KeyFramePosition_5);
+    Serial.print("Keyframe 5 Pan = : ");
+    Serial.println(KeyFramePan_5);
+    Serial.print("Keyframe 5 Tilt = : ");
+    Serial.println(KeyFrameTilt_5);
+
+  }
+}
+
+void ViewKeyFrame5(OSCMessage &msg, int addrOffset ) { //Anzeige des 5. KeyFrames
+  bool view = msg.getFloat(0);
+
+  Serial.print("View Keyframe5?= : ");
+  Serial.println(view);
+  if (view == 1) {
+    SliderPosition = KeyFramePosition_5;
+    Pankopf = KeyFramePan_5;
+    Tiltkopf = KeyFrameTilt_5;
+  }
+}
+
+void BeschleunigungKeyFrame5(OSCMessage &msg, int addrOffset ) { //Beschleunigung des 5. KeyFrames
+  KeyFrameBeschleunigung_5 = msg.getFloat(0);
+
+  Serial.print("KeyFrameBeschleunigung_5?= : ");
+  Serial.println(KeyFrameBeschleunigung_5);
+}
+
+
+void GeschwindigkeitKeyFrame5(OSCMessage &msg, int addrOffset ) { //Geschwindigkeit des 5. KeyFrames
+  KeyFrameGeschwindigkeit_5 = msg.getFloat(0);
+
+  Serial.print("KeyFrameGeschwindigkeit_5?= : ");
+  Serial.println(KeyFrameGeschwindigkeit_5);
+}
+
+
+void PauseKeyFrame5(OSCMessage &msg, int addrOffset ) { //Pause des 5. KeyFrames
+  KeyFramePause_5 = msg.getFloat(0);
+
+  Serial.print("KeyFramePause_5?= : ");
+  Serial.println(KeyFramePause_5);
+}
+
+
+//Modus 0------------------------------------------------------------------------------------------------
+
+void Position1(OSCMessage &msg, int addrOffset ) { //Pankopf
+  KeyFramePause_5 = msg.getFloat(0);
+
+  Serial.print("KeyFramePause_5?= : ");
+  Serial.println(KeyFramePause_5);
+}
+
+
+//Modus 3-------------------------------------------------------------------------------------------------------------------------------------------------------
+void runter(OSCMessage &msg, int addrOffset ) { //runter
+  Runter = msg.getFloat(0);
+
+  if (Runter == 1) {
+    Serial.println("runter");
+  }
+}
+
+void hoch(OSCMessage &msg, int addrOffset ) { //hoch
+  Hoch = msg.getFloat(0);
+
+  if (Hoch == 1) {
+    Serial.println("hoch");
+  }
+}
+
+void links(OSCMessage &msg, int addrOffset ) { //links
+  Links = msg.getFloat(0);
+
+  if (Links == 1) {
+    Serial.println("links");
+  }
+}
+
+void rechts(OSCMessage &msg, int addrOffset ) { //rechts
+  Rechts = msg.getFloat(0);
+
+  if (Rechts == 1) {
+    Serial.println("rechts");
+  }
+}
+
+void vor(OSCMessage &msg, int addrOffset ) { //vor
+  Vor = msg.getFloat(0);
+
+  if (Vor == 1) {
+    Serial.println("vor");
+  }
+}
+
+void zuruck(OSCMessage &msg, int addrOffset ) { //zuruck
+  Zuruck = msg.getFloat(0);
+
+  if (Zuruck == 1) {
+    Serial.println("zuruck");
+  }
+}
+
+//Modus_2---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+void Bilder(OSCMessage &msg, int addrOffset ) { //Bilder
+  bilder = msg.getFloat(0);
+  
+  Serial.print("Bilder: ");
+  Serial.println(bilder);
+  OSCMessage msgOUT("/modus_2/BilderLabel");
+  msgOUT.add(bilder);
+  Udp.beginPacket(Udp.remoteIP(), destPort);    //Sendet den Wert der am Encoder eingestellt wurde an den Anzeiger für die Position
+  msgOUT.send(Udp); // send the bytes
+  Udp.endPacket(); // mark the end of the OSC Packet
+  msgOUT.empty(); // free space occupied by message
+}
